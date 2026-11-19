@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  forms     Form[]
+}
+
+model Form {
+  id        String   @id @default(cuid())
+  title     String
+  /// 当前版本的 schema（JSON 字符串）
+  schema    String
+  version   Int      @default(1)
+  /// draft | published | closed
+  status    String   @default("draft")
+  /// 公开填写用的短码
+  shareId   String   @unique
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions    FormVersion[]
+  submissions Submission[]
+
+  @@index([ownerId])
+}
+
+/// 每个版本的 schema 快照：表单改版后，老提交仍能用当时的 schema 渲染
+model FormVersion {
+  id        String   @id @default(cuid())
+  formId    String
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  version   Int
+  schema    String
+  createdAt DateTime @default(now())
+
+  @@unique([formId, version])
+}
+
+model Submission {
+  id           String   @id @default(cuid())
+  formId       String
+  form         Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  /// 提交时表单的版本号，用于回溯 schema
+  formVersion  Int
+  /// 提交的数据（JSON 字符串，key 是字段 id）
+  data         String
+  ip           String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([formId, createdAt])
+}
