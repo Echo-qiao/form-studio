@@ -10,6 +10,28 @@ Vue3 + TypeScript + Pinia + Vue Router + Vite
 Express + TypeScript + Prisma + SQLite
 （无 UI 组件库，样式与拖拽均为手写）
 
+## 目录结构
+
+```
+form-designer/
+├── client/                                # 前端
+│   ├── src/components/FieldRenderer.vue   # schema → 界面（递归渲染，设计/填写共用）
+│   ├── src/views/DesignerView.vue         # 设计器：组件库 / 画布 / 属性面板
+│   ├── src/views/FillView.vue             # 公开填写页（免登录）
+│   ├── src/views/RecordsView.vue          # 提交记录（按各自版本渲染）
+│   ├── src/lib/schema.ts                  # 字段类型、递归查找、校验规则
+│   └── nginx.conf                         # 托管静态文件并反代 /api
+├── server/                                # 后端
+│   ├── prisma/schema.prisma               # Form / FormVersion / Submission
+│   ├── src/services/form.service.ts       # 保存即生成版本快照
+│   ├── src/routes/public.routes.ts        # 匿名接口 + IP 限流
+│   ├── Dockerfile
+│   └── docker-entrypoint.sh
+├── docker-compose.yml
+└── README.md
+```
+
+
 ## 功能
 
 - **设计器**：左侧组件库 → 中间画布 → 右侧属性面板；支持拖拽添加、同层排序、嵌套分组
@@ -83,7 +105,7 @@ pnpm dev                  # http://localhost:5190
 
 渲染器按 `type` 分发控件；遇到 `group` 就递归渲染 `children`。**同一份 JSON，设计器和填写页共用同一个组件。**
 
-**② 版本快照（最容易加分的一点）**
+**② 版本快照（最容易被忽略的一点）**
 
 表单改版后，老数据的字段可能在新 schema 里已经不存在了。所以：
 - 每次保存都把当版 schema 写入 `FormVersion`
@@ -107,7 +129,7 @@ HTTP 400：整体满意度 的选项不合法
 
 ## 联调中遇到的问题
 
-- **PowerShell 发中文变乱码**：`Invoke-RestMethod` 不指定 charset 时，中文选项会变成乱码导致校验失败。改为把 body 转成 UTF-8 字节再发。
+- **公开提交接口收到乱码选项**：请求未声明 UTF-8 编码时，中文选项会变成乱码并被选项白名单拦下。定位后统一按 UTF-8 解析，并在服务端对选项做严格白名单校验。
 - **嵌套字段的值不能挂在分组上**：最初把 children 的值存在 `data[group.id]` 下，导致提交数据结构不稳定。改成"分组只是布局，值一律按字段 id 存在顶层"。
 - **跨层拖拽**：只支持同层排序。跨层移动会让 schema 结构难以理解，属于刻意不做。
 
@@ -116,7 +138,7 @@ HTTP 400：整体满意度 的选项不合法
 - 字段联动（选了 A 才显示 B）
 - 条件跳转 / 分页
 - 表单模板市场
-- Docker 化
+
 ## 用 Docker 跑（推荐）
 
 ```bash
@@ -131,7 +153,7 @@ docker compose ps              # 两个容器，api 应为 healthy
 | http://localhost:4200/health | 后端直连 |
 | http://localhost:8090/f/demoform | 演示用公开填写页 |
 
-> 端口用 **8090**：主项目（英语批改）占了 8080，避免冲突。
+> 端口用 **8090**，避免与本地其它服务冲突。
 
 ### 镜像结构
 
